@@ -67,15 +67,23 @@ destinations() {
   fi
 }
 
+_CLEANUP_TMP=""
+
+cleanup_tmp() {
+  if [[ -n "${_CLEANUP_TMP}" && -d "${_CLEANUP_TMP}" ]]; then
+    rm -rf "${_CLEANUP_TMP}"
+  fi
+}
+
 install_with_git() {
-  local tmp dest src
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  local dest src
+  _CLEANUP_TMP="$(mktemp -d)"
+  trap cleanup_tmp EXIT
 
   echo "→ git clone --depth 1 https://github.com/${REPO}.git (${BRANCH})"
-  git clone --depth 1 --branch "$BRANCH" "https://github.com/${REPO}.git" "${tmp}/repo"
+  git clone --depth 1 --branch "$BRANCH" "https://github.com/${REPO}.git" "${_CLEANUP_TMP}/repo"
 
-  src="${tmp}/repo/${SKILL_PATH}"
+  src="${_CLEANUP_TMP}/repo/${SKILL_PATH}"
   if [[ ! -f "${src}/SKILL.md" ]]; then
     echo "error: ${SKILL_PATH}/SKILL.md not found in ${REPO}" >&2
     exit 1
