@@ -2,7 +2,12 @@
 
 Agent Skills for the [Vir programming language](https://github.com/virgori/Vir-lang) (Virgori Labs).
 
-Teaches coding agents Vir **v2.0** syntax, stdlib surfaces, and anti-hallucination rules so they do not invent Rust/Go/TypeScript patterns for `.vri` files.
+Skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `vir-lang` | Vir **v2.0** syntax / stdlib / anti-hallucination for `.vri` |
+| `virc-freeze` | Versioned **filesystem freezes** of stdlib+compiler for release & experiments (beyond git) |
 
 ## Quick install
 
@@ -17,7 +22,7 @@ npx skills add virgori/vir-lang-skills
 Global install, non-interactive:
 
 ```bash
-npx skills add virgori/vir-lang-skills --skill vir-lang -g -y
+npx skills add virgori/vir-lang-skills --skill vir-lang --skill virc-freeze -g -y
 ```
 
 Target specific agents:
@@ -41,22 +46,29 @@ curl -fsSL https://raw.githubusercontent.com/virgori/vir-lang-skills/main/instal
 ## Layout
 
 ```text
-skills/vir-lang/
-├── SKILL.md           # Agent instructions + YAML frontmatter
-├── references/        # Compact language facts (syntax, types, modules, …)
-└── examples/          # Idiomatic .vri samples
+skills/
+├── vir-lang/
+│   ├── SKILL.md
+│   ├── references/
+│   └── examples/
+└── virc-freeze/
+    ├── SKILL.md
+    └── scripts/freeze_std_tree.sh   # mirrored from Vir tools/
 ```
+
+In the Vir monorepo the live script is `tools/freeze_std_tree.sh` (writes under `frozen/`).
 
 ## Uninstall
 
 ```bash
 npx skills remove vir-lang
+npx skills remove virc-freeze
 ```
 
 Or delete installed copies:
 
 ```bash
-rm -rf ~/.cursor/skills/vir-lang ~/.agents/skills/vir-lang ~/.claude/skills/vir-lang
+rm -rf ~/.cursor/skills/{vir-lang,virc-freeze} ~/.agents/skills/{vir-lang,virc-freeze} ~/.claude/skills/{vir-lang,virc-freeze}
 ```
 
 ## License

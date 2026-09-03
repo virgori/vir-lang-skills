@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Install vir-lang agent skill from GitHub (Cursor, Codex, Claude, …)
+# Install vir-lang-skills (all skills under skills/) from GitHub
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/virgori/vir-lang-skills/main/install.sh | bash
 #   curl -fsSL …/install.sh | bash -s -- --project
-#   curl -fsSL …/install.sh | bash -s -- --global
+#   curl -fsSL …/install.sh | bash -s -- --skill virc-freeze
 set -euo pipefail
 
 REPO="${VIR_LANG_SKILLS_REPO:-virgori/vir-lang-skills}"
 BRANCH="${VIR_LANG_SKILLS_BRANCH:-main}"
-SKILL_NAME="vir-lang"
-SKILL_PATH="skills/${SKILL_NAME}"
 SCOPE="global"
 USE_NPX=1
+# empty = all skills
+SKILL_FILTER=""
 
 usage() {
   cat <<'EOF'
@@ -20,10 +20,11 @@ vir-lang-skills installer
   curl -fsSL https://raw.githubusercontent.com/virgori/vir-lang-skills/main/install.sh | bash
 
 Options (pass after bash -s --):
-  --project     Install into current repo (.cursor/skills, .agents/skills, .claude/skills)
-  --global      Install into user home (default)
-  --no-npx      Skip npx skills add; always git clone + copy
-  -h, --help    Show this help
+  --project           Install into current repo (.cursor/skills, …)
+  --global            Install into user home (default)
+  --skill <name>      Install only one skill (repeatable intent: pass once)
+  --no-npx            Skip npx skills add; always git clone + copy
+  -h, --help          Show this help
 
 Environment:
   VIR_LANG_SKILLS_REPO    GitHub repo (default: virgori/vir-lang-skills)
@@ -35,36 +36,42 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) SCOPE="project"; shift ;;
     --global)  SCOPE="global"; shift ;;
+    --skill)   SKILL_FILTER="$2"; shift 2 ;;
     --no-npx)  USE_NPX=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
   esac
 done
 
+dest_for() {
+  local name="$1"
+  if [[ "$SCOPE" == "project" ]]; then
+    printf '%s\n' \
+      ".cursor/skills/${name}" \
+      ".agents/skills/${name}" \
+      ".claude/skills/${name}"
+  else
+    printf '%s\n' \
+      "${HOME}/.cursor/skills/${name}" \
+      "${HOME}/.agents/skills/${name}" \
+      "${HOME}/.claude/skills/${name}"
+  fi
+}
+
 install_with_npx() {
   command -v npx >/dev/null 2>&1 || return 1
-  local -a args=(skills add "$REPO" --skill "$SKILL_NAME" -y)
+  local -a args=(skills add "$REPO" -y)
+  if [[ -n "$SKILL_FILTER" ]]; then
+    args+=(--skill "$SKILL_FILTER")
+  else
+    args+=(--skill '*')
+  fi
   if [[ "$SCOPE" == "global" ]]; then
     args+=(-g)
   fi
-  # Best-effort: common agents; skills CLI ignores unknown agents.
   args+=(-a cursor -a codex -a claude-code)
   echo "→ npx ${args[*]}"
   npx -y "${args[@]}"
-}
-
-destinations() {
-  if [[ "$SCOPE" == "project" ]]; then
-    printf '%s\n' \
-      ".cursor/skills/${SKILL_NAME}" \
-      ".agents/skills/${SKILL_NAME}" \
-      ".claude/skills/${SKILL_NAME}"
-  else
-    printf '%s\n' \
-      "${HOME}/.cursor/skills/${SKILL_NAME}" \
-      "${HOME}/.agents/skills/${SKILL_NAME}" \
-      "${HOME}/.claude/skills/${SKILL_NAME}"
-  fi
 }
 
 _CLEANUP_TMP=""
@@ -76,25 +83,27 @@ cleanup_tmp() {
 }
 
 install_with_git() {
-  local dest src
+  local dest src name
   _CLEANUP_TMP="$(mktemp -d)"
   trap cleanup_tmp EXIT
 
   echo "→ git clone --depth 1 https://github.com/${REPO}.git (${BRANCH})"
   git clone --depth 1 --branch "$BRANCH" "https://github.com/${REPO}.git" "${_CLEANUP_TMP}/repo"
 
-  src="${_CLEANUP_TMP}/repo/${SKILL_PATH}"
-  if [[ ! -f "${src}/SKILL.md" ]]; then
-    echo "error: ${SKILL_PATH}/SKILL.md not found in ${REPO}" >&2
-    exit 1
-  fi
-
-  while IFS= read -r dest; do
-    mkdir -p "$(dirname "$dest")"
-    rm -rf "$dest"
-    cp -R "$src" "$dest"
-    echo "✓ ${dest}"
-  done < <(destinations)
+  for src in "${_CLEANUP_TMP}/repo/skills"/*; do
+    [[ -d "$src" ]] || continue
+    name="$(basename "$src")"
+    if [[ -n "$SKILL_FILTER" && "$name" != "$SKILL_FILTER" ]]; then
+      continue
+    fi
+    [[ -f "${src}/SKILL.md" ]] || continue
+    while IFS= read -r dest; do
+      mkdir -p "$(dirname "$dest")"
+      rm -rf "$dest"
+      cp -R "$src" "$dest"
+      echo "✓ ${dest}"
+    done < <(dest_for "$name")
+  done
 }
 
 main() {
